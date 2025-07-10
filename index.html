@@ -1,0 +1,163 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Rank Viewer (CSV)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: 40px auto;
+            text-align: center;
+        }
+        h1 {
+            color: #0056b3;
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            background-color: #e9ecef;
+            text-align: left;
+            min-height: 80px; /* Ensures space even when no results */
+        }
+        #results p {
+            margin: 8px 0;
+            font-size: 1.1em;
+            color: #555;
+        }
+        #results p strong {
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GOVT ITI ATTINGAL RANK VIEWER</h1>
+        <label for="appNoInput">Enter Application Number:</label>
+        <input type="number" id="appNoInput" placeholder="e.g., 1, 2, 3, 4">
+        <button onclick="displayStudentDetails()">Get Details</button>
+
+        <div id="results">
+            <p>Enter an application number to view student details.</p>
+        </div>
+    </div>
+
+    <script>
+        // *** IMPORTANT: You need to replace this URL with the CSV URL for YOUR "Sheet1"
+        // This example URL is hypothetical; you must get it from your own Google Sheet.
+        // It should look similar to: 'https://docs.google.com/spreadsheets/d/e/YOUR_SHEET_ID_HERE/pub?gid=0&single=true&output=csv'
+        // Where 'gid=0' refers to your first sheet.
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRosk-FmhIBpKNqov84Lrw02cnf6yG8uhvO12qGFj86mZXnCq5MN7iXlsdj9ouAQN6Pngabc9F9UTQ4/pub?output=csv'; // Assuming gid=0 is your Sheet1
+
+        // Function to parse CSV text into an array of objects
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length === 0) return [];
+
+            // Split headers, trimming spaces. Example: "App No", "Name", "Mark", "Rank"
+            const headers = lines[0].split(',').map(header => header.trim());
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) { // Start from 1 to skip header row
+                const values = lines[i].split(',').map(value => value.trim());
+                const rowObject = {};
+                // Ensure values array matches headers length to prevent errors
+                if (values.length === headers.length) {
+                    headers.forEach((header, index) => {
+                        rowObject[header] = values[index];
+                    });
+                    data.push(rowObject);
+                } else {
+                    console.warn(`Skipping malformed row: ${lines[i]}`);
+                }
+            }
+            return data;
+        }
+
+        async function displayStudentDetails() {
+            const appNoInput = document.getElementById('appNoInput');
+            const resultsDiv = document.getElementById('results');
+            const appNo = appNoInput.value.trim();
+
+            resultsDiv.innerHTML = ''; // Clear previous results
+
+            if (!appNo || isNaN(parseInt(appNo)) || parseInt(appNo) <= 0) {
+                resultsDiv.innerHTML = '<p style="color: red;">Please enter a valid positive application number.</p>';
+                return;
+            }
+
+            resultsDiv.innerHTML = '<p>Loading data...</p>';
+
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const csvText = await response.text();
+                const studentData = parseCSV(csvText);
+
+                // Find the student by App No
+                // Compare as strings because CSV parsing reads values as strings.
+                // Using a regular expression for a more robust match (e.g., handles "1" vs " 1")
+                const student = studentData.find(s => s["App No"] && s["App No"].trim() === appNo);
+
+
+                if (student) {
+                    resultsDiv.innerHTML = `
+                        <p><strong>Application Number:</strong> ${student["App No"]}</p>
+                        <p><strong>Name:</strong> ${student.Name}</p>
+                        <p><strong>Mark:</strong> ${student.Mark}</p>
+                        <p><strong>Rank:</strong> ${student.Rank}</p>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<p style="color: red;">No details found for Application Number: <strong>${appNo}</strong>.</p>`;
+                }
+            } catch (error) {
+                console.error('Error fetching or parsing data:', error);
+                resultsDiv.innerHTML = `<p style="color: red;">An error occurred while fetching data. Please ensure your Google Sheet is published to the web as CSV, the URL is correct, and the sheet has proper headers (App No, Name, Mark, Rank).</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
